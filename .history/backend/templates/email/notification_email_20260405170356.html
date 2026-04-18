@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification from CFCT</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #3b82f6; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9fafb; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Notification from CFCT</h1>
+        </div>
+        <div class="content">
+            <h2>Dear {{ full_name }},</h2>
+            <p>{{ message }}</p>
+            <p><a href="{{ site_url }}">Visit our website</a> for more information.</p>
+            <p>In His service,<br>CFCT Team</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 Christian Fellowship Church Tanzania. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

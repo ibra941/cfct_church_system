@@ -1,0 +1,338 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label='accounts' %}">Accounts</a>
+    &rsaquo; <a href="{% url 'admin:accounts_user_changelist' %}">Users</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <div class="module">
+    <h1>{{ title }}</h1>
+
+    <div class="object-info">
+      <h2>Current User Information</h2>
+      <p><strong>Username:</strong> {{ user.username }}</p>
+      <p><strong>Full Name:</strong> {{ user.full_name }}</p>
+      <p><strong>Email:</strong> {{ user.email }}</p>
+      <p><strong>Phone:</strong> {{ user.phone }}</p>
+      <p><strong>Current Role:</strong> {{ user.get_role_display }}</p>
+      <p><strong>Current Church:</strong> {{ user.church.name|default:"None" }}</p>
+      <p><strong>Status:</strong> {% if user.is_active %}Active{% else %}Inactive{% endif %} / {% if user.is_approved %}Approved{% else %}Not Approved{% endif %}</p>
+      <p><strong>Member Since:</strong> {{ user.created_at|date:"M d, Y" }}</p>
+    </div>
+
+    <form method="post" id="user-management-form">
+      {% csrf_token %}
+
+      <div class="form-row">
+        <label for="id_new_role">Role:</label>
+        <select name="new_role" id="id_new_role" required>
+          <option value="{{ user.role }}" selected>{{ user.get_role_display }}</option>
+          <option value="national_leader">National Leader</option>
+          <option value="zone_leader">Zone Leader</option>
+          <option value="regional_leader">Regional Leader</option>
+          <option value="district_leader">District Leader</option>
+          <option value="local_leader">Local Leader (Church Leader)</option>
+          <option value="local_member">Local Member</option>
+          <option value="finance_team">Finance Team</option>
+        </select>
+      </div>
+
+      <!-- Church Selection (shown for certain roles) -->
+      <div id="church-selection-section" style="display: none;">
+        <h3>Church Assignment</h3>
+
+        <div class="form-row">
+          <label for="id_zone">Zone:</label>
+          <select name="zone" id="id_zone">
+            <option value="">Select Zone</option>
+            {% for zone in zones %}
+            <option value="{{ zone.id }}">{{ zone.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="id_region">Region:</label>
+          <select name="region" id="id_region" disabled>
+            <option value="">Select Region</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="id_district">District:</label>
+          <select name="district" id="id_district" disabled>
+            <option value="">Select District</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="id_new_church">Local Church:</label>
+          <select name="new_church" id="id_new_church" disabled>
+            <option value="">Select Church</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="submit-row">
+        <input type="submit" value="Update User" class="default" />
+        <a href="{% url 'admin:accounts_user_changelist' %}" class="button">Cancel</a>
+        <a href="{% url 'admin:accounts_user_delete' user.id %}" class="button delete-link" style="background: #ba2121; color: white;">Delete User</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const roleSelect = document.getElementById("id_new_role");
+    const churchSection = document.getElementById("church-selection-section");
+    const zoneSelect = document.getElementById("id_zone");
+    const regionSelect = document.getElementById("id_region");
+    const districtSelect = document.getElementById("id_district");
+    const churchSelect = document.getElementById("id_new_church");
+
+    // Define which roles require church assignment
+    const rolesNeedingChurch = ['zone_leader', 'regional_leader', 'district_leader', 'local_leader', 'local_member'];
+
+    roleSelect.addEventListener("change", function () {
+      const role = this.value;
+      if (rolesNeedingChurch.includes(role)) {
+        churchSection.style.display = "block";
+        // Pre-select appropriate church level based on role
+        setupChurchSelectionForRole(role);
+      } else {
+        churchSection.style.display = "none";
+        clearChurchSelection();
+      }
+    });
+
+    function setupChurchSelectionForRole(role) {
+      // Clear all selections
+      zoneSelect.value = '';
+      regionSelect.innerHTML = '<option value="">Select Region</option>';
+      districtSelect.innerHTML = '<option value="">Select District</option>';
+      churchSelect.innerHTML = '<option value="">Select Church</option>';
+
+      // Enable/disable appropriate levels based on role
+      switch(role) {
+        case 'zone_leader':
+          zoneSelect.disabled = false;
+          regionSelect.disabled = true;
+          districtSelect.disabled = true;
+          churchSelect.disabled = true;
+          break;
+        case 'regional_leader':
+          zoneSelect.disabled = false;
+          regionSelect.disabled = false;
+          districtSelect.disabled = true;
+          churchSelect.disabled = true;
+          break;
+        case 'district_leader':
+          zoneSelect.disabled = false;
+          regionSelect.disabled = false;
+          districtSelect.disabled = false;
+          churchSelect.disabled = true;
+          break;
+        case 'local_leader':
+        case 'local_member':
+          zoneSelect.disabled = false;
+          regionSelect.disabled = false;
+          districtSelect.disabled = false;
+          churchSelect.disabled = false;
+          break;
+      }
+    }
+
+    function clearChurchSelection() {
+      zoneSelect.value = '';
+      regionSelect.innerHTML = '<option value="">Select Region</option>';
+      districtSelect.innerHTML = '<option value="">Select District</option>';
+      churchSelect.innerHTML = '<option value="">Select Church</option>';
+      zoneSelect.disabled = true;
+      regionSelect.disabled = true;
+      districtSelect.disabled = true;
+      churchSelect.disabled = true;
+    }
+
+    // Load regions when zone is selected
+    zoneSelect.addEventListener('change', function() {
+      const zoneId = this.value;
+      if (zoneId && !regionSelect.disabled) {
+        fetch(`/admin/accounts/api/regions/?zone_id=${zoneId}`)
+          .then(response => response.json())
+          .then(data => {
+            regionSelect.innerHTML = '<option value="">Select Region</option>';
+            data.forEach(region => {
+              regionSelect.innerHTML += `<option value="${region.id}">${region.name}</option>`;
+            });
+          });
+      } else {
+        regionSelect.innerHTML = '<option value="">Select Region</option>';
+      }
+      districtSelect.innerHTML = '<option value="">Select District</option>';
+      churchSelect.innerHTML = '<option value="">Select Church</option>';
+    });
+
+    // Load districts when region is selected
+    regionSelect.addEventListener('change', function() {
+      const regionId = this.value;
+      if (regionId && !districtSelect.disabled) {
+        fetch(`/admin/accounts/api/districts/?region_id=${regionId}`)
+          .then(response => response.json())
+          .then(data => {
+            districtSelect.innerHTML = '<option value="">Select District</option>';
+            data.forEach(district => {
+              districtSelect.innerHTML += `<option value="${district.id}">${district.name}</option>`;
+            });
+          });
+      } else {
+        districtSelect.innerHTML = '<option value="">Select District</option>';
+      }
+      churchSelect.innerHTML = '<option value="">Select Church</option>';
+    });
+
+    // Load churches when district is selected
+    districtSelect.addEventListener('change', function() {
+      const districtId = this.value;
+      if (districtId && !churchSelect.disabled) {
+        fetch(`/admin/accounts/api/churches/?district_id=${districtId}`)
+          .then(response => response.json())
+          .then(data => {
+            churchSelect.innerHTML = '<option value="">Select Church</option>';
+            data.forEach(church => {
+              churchSelect.innerHTML += `<option value="${church.id}">${church.name}</option>`;
+            });
+          });
+      } else {
+        churchSelect.innerHTML = '<option value="">Select Church</option>';
+      }
+    });
+
+    // Initialize based on current role
+    const currentRole = roleSelect.value;
+    if (rolesNeedingChurch.includes(currentRole)) {
+      churchSection.style.display = "block";
+      setupChurchSelectionForRole(currentRole);
+    }
+  });
+</script>
+
+<style>
+  .object-info {
+    background: #f8f8f8;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+  }
+
+  .object-info h2 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.2em;
+  }
+
+  .object-info p {
+    margin: 5px 0;
+    font-size: 0.9em;
+  }
+
+  #church-selection-section {
+    background: #f9f9f9;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+  }
+
+  #church-selection-section h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.1em;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+  }
+
+  .form-row {
+    margin-bottom: 15px;
+  }
+
+  .form-row label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+  }
+
+  .form-row select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .form-row select:disabled {
+    background-color: #f5f5f5;
+    color: #999;
+  }
+
+  .submit-row {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .submit-row input,
+  .submit-row a {
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+  }
+
+  .submit-row input.default {
+    background: #79aec8;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+
+  .submit-row input.default:hover {
+    background: #5dade2;
+  }
+
+  .submit-row a.button {
+    background: #f8f8f8;
+    color: #333;
+    border: 1px solid #ccc;
+  }
+
+  .submit-row a.button:hover {
+    background: #e8e8e8;
+  }
+
+  .submit-row a.delete-link {
+    background: #ba2121 !important;
+    color: white !important;
+    border: 1px solid #a91515 !important;
+  }
+
+  .submit-row a.delete-link:hover {
+    background: #a91515 !important;
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,3 @@
+export const ROLES = { NATIONAL_LEADER: 'national_leader', ZONE_LEADER: 'zone_leader', REGIONAL_LEADER: 'regional_leader', DISTRICT_LEADER: 'district_leader', LOCAL_MEMBER: 'local_member', FINANCE_TEAM: 'finance_team' }
+export const OFFERING_TYPES = { TITHE: 'tithe', OFFERING: 'offering', BUILDING: 'building', MISSION: 'mission', BENEVOLENCE: 'benevolence' }
+export const PAYMENT_METHODS = { CASH: 'cash', MOBILE: 'mobile', BANK: 'bank', CHEQUE: 'cheque' }

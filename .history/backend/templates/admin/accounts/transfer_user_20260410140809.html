@@ -1,0 +1,169 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label='accounts' %}">Accounts</a>
+    &rsaquo; <a href="{% url 'admin:accounts_user_changelist' %}">Users</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <div class="module">
+    <h1>{{ title }}</h1>
+
+    <div class="object-info">
+      <h2>Current User Information</h2>
+      <p><strong>Username:</strong> {{ user.username }}</p>
+      <p><strong>Full Name:</strong> {{ user.full_name }}</p>
+      <p><strong>Email:</strong> {{ user.email }}</p>
+      <p><strong>Phone:</strong> {{ user.phone }}</p>
+      <p><strong>Current Role:</strong> {{ user.get_role_display }}</p>
+      <p><strong>Current Church:</strong> {{ user.church.name|default:"None" }}</p>
+      <p><strong>Status:</strong> {% if user.is_active %}Active{% else %}Inactive{% endif %} / {% if user.is_approved %}Approved{% else %}Not Approved{% endif %}</p>
+      <p><strong>Member Since:</strong> {{ user.created_at|date:"M d, Y" }}</p>
+    </div>
+
+    <form method="post" id="user-management-form">
+      {% csrf_token %}
+
+      <div class="form-row">
+        <label for="id_new_role">Role:</label>
+        <select name="new_role" id="id_new_role" required>
+          <option value="{{ user.role }}" selected>{{ user.get_role_display }}</option>
+          <option value="national_leader">National Leader</option>
+          <option value="zone_leader">Zone Leader</option>
+          <option value="regional_leader">Regional Leader</option>
+          <option value="district_leader">District Leader</option>
+          <option value="local_leader">Local Leader (Church Leader)</option>
+          <option value="local_member">Local Member</option>
+          <option value="finance_team">Finance Team</option>
+        </select>
+      </div>
+
+      <!-- Church Selection (shown for certain roles) -->
+      <div id="church-selection-section" style="display: none;">
+        <h3>Church Assignment</h3>
+
+        <div class="form-row">
+          <label for="id_zone">Zone:</label>
+          <select name="zone" id="id_zone">
+            <option value="">Select Zone</option>
+            {% for zone in zones %}
+            <option value="{{ zone.id }}">{{ zone.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="id_region">Region:</label>
+          <select name="region" id="id_region" disabled>
+            <option value="">Select Region</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="id_district">District:</label>
+          <select name="district" id="id_district" disabled>
+            <option value="">Select District</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="id_new_church">Local Church:</label>
+          <select name="new_church" id="id_new_church" disabled>
+            <option value="">Select Church</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="submit-row">
+        <input type="submit" value="Update User" class="default" />
+        <a href="{% url 'admin:accounts_user_changelist' %}" class="button">Cancel</a>
+        <a href="{% url 'admin:accounts_user_delete' user.id %}" class="button delete-link" style="background: #ba2121; color: white;">Delete User</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const roleSelect = document.getElementById("id_new_role");
+    const churchSelection = document.getElementById("church-selection");
+    const churchSelect = document.getElementById("id_new_church");
+
+    roleSelect.addEventListener("change", function () {
+      const role = this.value;
+      if (role === "local_leader" || role === "local_member") {
+        churchSelection.style.display = "block";
+        loadChurches();
+      } else {
+        churchSelection.style.display = "none";
+      }
+    });
+
+    function loadChurches() {
+      fetch("/admin/accounts/api/churches/")
+        .then((response) => response.json())
+        .then((data) => {
+          churchSelect.innerHTML = '<option value="">Select Church</option>';
+          data.forEach((church) => {
+            churchSelect.innerHTML += `<option value="${church.id}">${church.name}</option>`;
+          });
+        });
+    }
+  });
+</script>
+
+<style>
+  .object-info {
+    background: #f8f8f8;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+  }
+
+  .object-info h2 {
+    margin-top: 0;
+    color: #333;
+  }
+
+  .object-info p {
+    margin: 5px 0;
+  }
+
+  .form-row {
+    margin-bottom: 15px;
+  }
+
+  .form-row label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+
+  .form-row select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+
+  .submit-row {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+  }
+
+  .submit-row input,
+  .submit-row a {
+    margin-right: 10px;
+  }
+</style>
+{% endblock %}
