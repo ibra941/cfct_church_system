@@ -17,6 +17,7 @@ jobs:
       DB_PORT: 5432
       SECRET_KEY: github-actions-test-key
       DEBUG: "True"
+      USE_SQLITE_FOR_TESTS: "True"
 
     services:
       postgres:

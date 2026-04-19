@@ -87,6 +87,15 @@ DATABASES = {
     }
 }
 
+# Keep CI tests deterministic by allowing a lightweight SQLite test database.
+if os.getenv('USE_SQLITE_FOR_TESTS', 'False') == 'True':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
