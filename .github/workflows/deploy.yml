@@ -60,7 +60,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && secrets.SERVER_HOST != '' && secrets.SERVER_USER != '' && secrets.SSH_PRIVATE_KEY != ''
 
     steps:
       - uses: actions/checkout@v3
