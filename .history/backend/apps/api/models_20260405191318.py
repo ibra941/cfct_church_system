@@ -1,1 +1,0 @@
-# No models for API app - it uses models from other apps

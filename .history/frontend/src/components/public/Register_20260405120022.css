@@ -1,7 +1,0 @@
-.step-indicator {
-  transition: all 0.3s ease;
-}
-.step-indicator.active {
-  background-color: #2563eb;
-  color: white;
-}
