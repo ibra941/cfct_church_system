@@ -1,8 +1,0 @@
-{
-  "name": "CFCT Church Management",
-  "short_name": "CFCT",
-  "start_url": "/",
-  "display": "standalone",
-  "theme_color": "#1E3A8A",
-  "background_color": "#FFFFFF"
-}

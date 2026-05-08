@@ -1,7 +1,0 @@
-.navbar-scroll {
-  backdrop-filter: blur(10px);
-  background-color: rgba(255, 255, 255, 0.9);
-}
-.dark .navbar-scroll {
-  background-color: rgba(31, 41, 55, 0.9);
-}
