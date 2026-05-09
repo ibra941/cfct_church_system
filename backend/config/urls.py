@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
 from django.views.generic import RedirectView
+from django.http import JsonResponse, HttpResponse
 from rest_framework.permissions import AllowAny
 from rest_framework.renderers import JSONOpenAPIRenderer
 from rest_framework.schemas import get_schema_view
@@ -25,6 +26,21 @@ FRONTEND_DIST_DIR = settings.BASE_DIR.parent / 'frontend' / 'dist'
 FRONTEND_PUBLIC_DIR = settings.BASE_DIR.parent / 'frontend' / 'public'
 FRONTEND_SRC_ASSETS_DIR = settings.BASE_DIR.parent / 'frontend' / 'src' / 'assets'
 
+
+def api_root(_request):
+    return JsonResponse(
+        {
+            'service': 'cfct-backend',
+            'status': 'ok',
+            'health': '/api/health/live/',
+            'docs': '/api/docs/openapi.json',
+        }
+    )
+
+
+def empty_favicon(_request):
+    return HttpResponse(status=204)
+
 urlpatterns = [
     path('admin', RedirectView.as_view(url='/admin/', permanent=False)),
     path('admin/', admin_site.urls),
@@ -37,24 +53,9 @@ urlpatterns = [
     # OpenAPI schema endpoint
     path('api/docs/openapi.json', schema_view, name='openapi-json'),
 
-    # Frontend routes (served from built Vite output)
-    path('', serve, {'path': 'index.html', 'document_root': str(FRONTEND_DIST_DIR)}, name='site-home'),
-    path('assets/images/<path:path>', serve, {'document_root': str(FRONTEND_SRC_ASSETS_DIR / 'images')}),
-    path('assets/<path:path>', serve, {'document_root': str(FRONTEND_DIST_DIR / 'assets')}),
-    path('icons/<path:path>', serve, {'document_root': str(FRONTEND_PUBLIC_DIR / 'icons')}),
-    path('manifest.json', serve, {'path': 'manifest.json', 'document_root': str(FRONTEND_DIST_DIR)}),
-    path('manifest.webmanifest', serve, {'path': 'manifest.webmanifest', 'document_root': str(FRONTEND_DIST_DIR)}),
-    path('robots.txt', serve, {'path': 'robots.txt', 'document_root': str(FRONTEND_DIST_DIR)}),
-    path('registerSW.js', serve, {'path': 'registerSW.js', 'document_root': str(FRONTEND_DIST_DIR)}),
-    path('sw.js', serve, {'path': 'sw.js', 'document_root': str(FRONTEND_DIST_DIR)}),
-    re_path(r'^(?P<path>workbox-.*\.js)$', serve, {'document_root': str(FRONTEND_DIST_DIR)}),
-
-    # SPA client-side routes fallback
-    re_path(
-        r'^(?!(admin(?:/|$)|api(?:/|$)|media(?:/|$)|static(?:/|$))).*$',
-        serve,
-        {'path': 'index.html', 'document_root': str(FRONTEND_DIST_DIR)},
-    ),
+    # API service root and favicon for platform probes/browser requests
+    path('', api_root, name='api-root'),
+    path('favicon.ico', empty_favicon, name='favicon'),
 ]
 
 if settings.DEBUG:

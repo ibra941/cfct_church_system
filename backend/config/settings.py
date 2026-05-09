@@ -15,11 +15,23 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 if not DEBUG and (not SECRET_KEY or SECRET_KEY == _DEFAULT_SECRET_KEY):
     raise RuntimeError('SECRET_KEY must be set to a strong non-default value when DEBUG=False.')
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+_render_hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
+_render_url = os.getenv('RENDER_EXTERNAL_URL', '').strip()
+_default_allowed_hosts = ['localhost', '127.0.0.1']
+if _render_hostname:
+    _default_allowed_hosts.append(_render_hostname)
+
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', ','.join(_default_allowed_hosts)).split(',') if h.strip()]
+
+_default_csrf_trusted_origins = []
+if _render_url:
+    _default_csrf_trusted_origins.append(_render_url.rstrip('/'))
+elif _render_hostname:
+    _default_csrf_trusted_origins.append(f'https://{_render_hostname}')
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+    for origin in os.getenv('CSRF_TRUSTED_ORIGINS', ','.join(_default_csrf_trusted_origins)).split(',')
     if origin.strip()
 ]
 
