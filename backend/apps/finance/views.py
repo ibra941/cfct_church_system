@@ -37,19 +37,46 @@ class MonthlySummaryView(generics.GenericAPIView):
     
     def get(self, request):
         from datetime import datetime, timedelta
-        from apps.api.views import get_accessible_churches
-        
-        # Use accessible churches (not just request.user.church) for multi-level access
-        churches = get_accessible_churches(request.user)
-        
-        # Get offerings instead of financial transactions
+        from django.db.models import Q
+        from apps.churches.models import Church
         from apps.offerings.models import Offering
+        
+        # Get all accessible churches for the user (multi-level hierarchy support)
+        user = request.user
+        if user.role == 'national_leader':
+            churches = Church.objects.all()
+        elif user.church:
+            # Get all churches in user's hierarchy based on their role
+            base_church = user.church
+            if user.role == 'zone_leader':
+                churches = Church.objects.filter(
+                    Q(id=base_church.id) |
+                    Q(parent_church=base_church) |
+                    Q(parent_church__parent_church=base_church) |
+                    Q(parent_church__parent_church__parent_church=base_church)
+                )
+            elif user.role == 'regional_leader':
+                churches = Church.objects.filter(
+                    Q(id=base_church.id) |
+                    Q(parent_church=base_church) |
+                    Q(parent_church__parent_church=base_church)
+                )
+            elif user.role == 'district_leader':
+                churches = Church.objects.filter(
+                    Q(id=base_church.id) | Q(parent_church=base_church)
+                )
+            else:
+                churches = Church.objects.filter(id=base_church.id)
+        else:
+            churches = Church.objects.none()
+        
+        # Get offerings with valid payment dates
         offerings = Offering.objects.filter(church__in=churches, payment_date__isnull=False)
         
         # Build monthly summary
         monthly_totals = {}
         for offering in offerings:
-            if offering.payment_date:  # Skip offerings with no payment_date
+            if offering.payment_date:
                 month_key = offering.payment_date.strftime('%b %Y')
                 monthly_totals[month_key] = monthly_totals.get(month_key, 0) + float(offering.amount or 0)
         
