@@ -2726,15 +2726,18 @@ class MonthlySummaryView(APIView):
     
     def get(self, request):
         churches = get_accessible_churches(request.user)
-        offerings = Offering.objects.filter(church__in=churches)
+        # Only include offerings with valid payment dates and amounts
+        offerings = Offering.objects.filter(church__in=churches, payment_date__isnull=False)
 
         monthly_income = []
         monthly_totals = {}
         for offering in offerings:
-            month_key = offering.payment_date.strftime('%b %Y')
-            monthly_totals[month_key] = monthly_totals.get(month_key, 0) + float(offering.amount)
+            if offering.payment_date:  # Double-check payment_date exists
+                month_key = offering.payment_date.strftime('%b %Y')
+                amount = offering.amount or 0
+                monthly_totals[month_key] = monthly_totals.get(month_key, 0) + float(amount)
 
-        for month, amount in monthly_totals.items():
+        for month, amount in sorted(monthly_totals.items()):
             monthly_income.append({'month': month, 'amount': amount})
 
         offerings_by_type = [

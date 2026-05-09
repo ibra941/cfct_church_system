@@ -37,29 +37,35 @@ class MonthlySummaryView(generics.GenericAPIView):
     
     def get(self, request):
         from datetime import datetime, timedelta
+        from apps.api.views import get_accessible_churches
         
-        end_date = timezone.now()
-        start_date = end_date - timedelta(days=365)
+        # Use accessible churches (not just request.user.church) for multi-level access
+        churches = get_accessible_churches(request.user)
         
-        transactions = FinancialTransaction.objects.filter(
-            church=request.user.church,
-            transaction_date__gte=start_date,
-            transaction_date__lte=end_date
-        )
+        # Get offerings instead of financial transactions
+        from apps.offerings.models import Offering
+        offerings = Offering.objects.filter(church__in=churches, payment_date__isnull=False)
         
-        monthly_data = []
-        current = start_date
-        while current <= end_date:
-            month_transactions = transactions.filter(
-                transaction_date__year=current.year,
-                transaction_date__month=current.month
-            )
-            monthly_data.append({
-                'month': current.strftime('%B %Y'),
-                'income': month_transactions.filter(transaction_type='income').aggregate(total=Sum('amount'))['total'] or 0,
-                'expense': month_transactions.filter(transaction_type='expense').aggregate(total=Sum('amount'))['total'] or 0
-            })
-            current += timedelta(days=32)
-            current = current.replace(day=1)
+        # Build monthly summary
+        monthly_totals = {}
+        for offering in offerings:
+            if offering.payment_date:  # Skip offerings with no payment_date
+                month_key = offering.payment_date.strftime('%b %Y')
+                monthly_totals[month_key] = monthly_totals.get(month_key, 0) + float(offering.amount or 0)
         
-        return Response(monthly_data)
+        monthly_income = [
+            {'month': month, 'amount': amount}
+            for month, amount in sorted(monthly_totals.items())
+        ]
+        
+        # Group by offering type
+        offerings_by_type = [
+            {'type': row['offering_type'], 'amount': float(row['amount'] or 0)}
+            for row in offerings.values('offering_type').annotate(amount=Sum('amount'))
+        ]
+        
+        return Response({
+            'monthly_income': monthly_income,
+            'offerings_by_type': offerings_by_type,
+            'total_income': sum(item['amount'] for item in monthly_income),
+        })
