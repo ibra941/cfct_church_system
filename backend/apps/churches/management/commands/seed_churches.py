@@ -20,6 +20,12 @@ class Command(BaseCommand):
                 'is_active': True
             }
         )
+        national_church.name = 'Christian Fellowship Church Tanzania'
+        national_church.church_type = 'national'
+        national_church.country = 'Tanzania'
+        national_church.is_active = True
+        national_church.parent_church = None
+        national_church.save(update_fields=['name', 'church_type', 'country', 'is_active', 'parent_church'])
         if created:
             self.stdout.write(self.style.SUCCESS(f"✅ National church: {national_church.name}"))
 
@@ -108,6 +114,11 @@ class Command(BaseCommand):
                     'is_active': True
                 }
             )
+            zone_church.name = zone_name
+            zone_church.church_type = 'zone'
+            zone_church.parent_church = national_church
+            zone_church.is_active = True
+            zone_church.save(update_fields=['name', 'church_type', 'parent_church', 'is_active'])
             if z_created:
                 created_zones += 1
                 self.stdout.write(f"✅ Zone: {zone_church.name}")
@@ -139,6 +150,11 @@ class Command(BaseCommand):
                         'is_active': True
                     }
                 )
+                region_church.name = region_name
+                region_church.church_type = 'region'
+                region_church.parent_church = zone_church
+                region_church.is_active = True
+                region_church.save(update_fields=['name', 'church_type', 'parent_church', 'is_active'])
                 if r_created:
                     created_regions += 1
                     self.stdout.write(f"   📍 Region: {region_church.name}")
@@ -171,6 +187,11 @@ class Command(BaseCommand):
                                 'is_active': True
                             }
                         )
+                        district_church.name = district_name
+                        district_church.church_type = 'district'
+                        district_church.parent_church = region_church
+                        district_church.is_active = True
+                        district_church.save(update_fields=['name', 'church_type', 'parent_church', 'is_active'])
                         if d_created:
                             created_districts += 1
                             self.stdout.write(f"      🏛️ District: {district_church.name}")
@@ -202,6 +223,11 @@ class Command(BaseCommand):
                                     'is_active': True
                                 }
                             )
+                            local_church.name = f'{district_name} Church {i}'
+                            local_church.church_type = 'local'
+                            local_church.parent_church = district_church
+                            local_church.is_active = True
+                            local_church.save(update_fields=['name', 'church_type', 'parent_church', 'is_active'])
                             if l_created:
                                 created_local_churches += 1
 
@@ -221,4 +247,12 @@ class Command(BaseCommand):
                             )
 
         self.stdout.write(self.style.SUCCESS("\n🎉 Seeding completed successfully!"))
-        self.stdout.write(f"📊 Summary: {created_zones} zones, {created_regions} regions, {created_districts} districts, {created_local_churches} local churches")
+        self.stdout.write(
+            f"📊 Created this run: {created_zones} zones, {created_regions} regions, {created_districts} districts, {created_local_churches} local churches"
+        )
+        self.stdout.write(
+            f"📊 Totals in DB: {Church.objects.filter(church_type='zone').count()} zones, "
+            f"{Church.objects.filter(church_type='region').count()} regions, "
+            f"{Church.objects.filter(church_type='district').count()} districts, "
+            f"{Church.objects.filter(church_type='local').count()} local churches"
+        )
