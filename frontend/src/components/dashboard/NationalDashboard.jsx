@@ -40,6 +40,7 @@ import {
   normalizeMonthlyChartData,
   normalizeOfferingSummary,
 } from "../../utils/apiTransforms";
+import { fetchZones } from "../../utils/churchHierarchy";
 import DashboardCards from "./DashboardCards";
 
 const NationalDashboard = () => {
@@ -163,11 +164,10 @@ const NationalDashboard = () => {
       setRecentEvents(extractListData(eventsResponse.data) || []);
 
       try {
-        const zonesResponse = await api.get("/zones/");
-        const zonesData =
-          zonesResponse.data.results || zonesResponse.data || [];
+        const zonesData = await fetchZones();
         setZones(Array.isArray(zonesData) ? zonesData : []);
-      } catch {
+      } catch (error) {
+        console.error("Error fetching zones:", error);
         setZones([]);
       }
 

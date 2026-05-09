@@ -13,7 +13,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import Sidebar from "./Sidebar";
 
-const Navbar = ({ showSidebarToggle = true }) => {
+const Navbar = ({ showSidebarToggle = true, onMenuClick }) => {
   const { user, logout } = useAuth();
   const { language, toggleLanguage } = useLanguage();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -54,8 +54,14 @@ const Navbar = ({ showSidebarToggle = true }) => {
             <div className="flex items-center">
               {isAuthenticated && showSidebarToggle && (
                 <button
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="mr-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => {
+                    if (onMenuClick) {
+                      onMenuClick();
+                    } else {
+                      setSidebarOpen(!sidebarOpen);
+                    }
+                  }}
+                  className="mr-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 lg:hidden"
                   aria-label={language === "sw" ? "Fungua menu" : "Open menu"}
                 >
                   <FaBars className="text-gray-600 dark:text-gray-300" />

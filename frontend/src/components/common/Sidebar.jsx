@@ -25,7 +25,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 
-const Sidebar = () => {
+const Sidebar = ({ onClose }) => {
   const { user } = useAuth();
   const { language } = useLanguage();
   const location = useLocation();
@@ -368,6 +368,10 @@ const Sidebar = () => {
           <Link
             key={index}
             to={item.path}
+            onClick={() => {
+              // Close mobile sidebar after navigation
+              if (onClose) onClose();
+            }}
             className={`flex items-center space-x-3 px-4 py-3 rounded-lg mb-1 transition ${
               isActive(item.path)
                 ? "bg-primary-600 text-white"
@@ -383,7 +387,7 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="w-64 bg-white dark:bg-gray-800 shadow-lg h-screen sticky top-0 overflow-y-auto flex-shrink-0">
+    <aside className="w-64 bg-white dark:bg-gray-800 shadow-lg h-screen overflow-y-auto flex-shrink-0 flex flex-col">
       {/* Logo Section */}
       <div className="p-4 border-b dark:border-gray-700">
         <Link to="/dashboard" className="flex items-center space-x-2">
@@ -424,7 +428,10 @@ const Sidebar = () => {
       {/* Logout Section */}
       <div className="p-4 border-t dark:border-gray-700 mt-auto">
         <button
-          onClick={() => navigate("/logout")}
+          onClick={() => {
+            if (onClose) onClose();
+            navigate("/logout");
+          }}
           className="flex items-center space-x-3 px-4 py-3 rounded-lg w-full text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
         >
           <span className="text-lg">
