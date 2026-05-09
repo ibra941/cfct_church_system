@@ -336,9 +336,9 @@ class CoreApiTests(APITestCase):
         self.assertGreater(response.data.get('attendance_rate', 0), 0)
 
     @unittest.skipUnless(SWAGGER_AVAILABLE, 'drf_yasg is not installed in this environment')
-    def test_openapi_swagger_endpoint_is_available(self):
-        response = self.client.get('/api/docs/swagger/')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+def test_openapi_schema_endpoint_is_available(self):
+    response = self.client.get('/api/docs/openapi.json')
+    self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_standardized_error_payload_for_unauthorized_request(self):
         response = self.client.get('/api/churches/')
