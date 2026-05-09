@@ -76,6 +76,48 @@ def get_registration_blocking_error(email):
 
     return 'This email is already registered.'
 
+
+def _generate_username_from_name(full_name, exclude_user_id=None):
+    source_name = (full_name or '').strip().lower()
+    normalized_name = re.sub(r'\s+', '_', source_name)
+    base_username = re.sub(r'[^a-z0-9_]', '', normalized_name)[:30] or f"member_{int(timezone.now().timestamp())}"
+
+    username = base_username
+    counter = 1
+    queryset = User.objects.all()
+    if exclude_user_id:
+        queryset = queryset.exclude(id=exclude_user_id)
+
+    while queryset.filter(username=username).exists():
+        suffix = str(counter)
+        max_base_len = max(1, 30 - len(suffix))
+        username = f"{base_username[:max_base_len]}{suffix}"
+        counter += 1
+
+    return username
+
+
+def _generate_secure_password(length=12):
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _send_approval_credentials_email(user_obj, approved_name, username, password):
+    if not user_obj.email:
+        return
+    send_email_notification(
+        'CFCT Registration Approved - Your Access Credentials',
+        (
+            f'Hello {approved_name},\n\n'
+            'Your registration has been approved. Use the credentials below for your first login:\n\n'
+            f'Username: {username}\n'
+            f'Password: {password}\n\n'
+            'For security, please change your password immediately after your first login.\n\n'
+            'Blessings,\nCFCT Management Team'
+        ),
+        [user_obj.email],
+    )
+
 class MemberRegistrationViewSet(viewsets.ModelViewSet):
     queryset = MemberRegistration.objects.all()
     serializer_class = MemberRegistrationSerializer
@@ -132,14 +174,9 @@ class MemberRegisterView(generics.CreateAPIView):
         if duplicate_error:
             return Response({'error': duplicate_error}, status=status.HTTP_400_BAD_REQUEST)
         
-        email = personal_info.get('email', '')
-        username = email.split('@')[0] if email else f"user_{int(timezone.now().timestamp())}"
-        
-        base_username = username
-        counter = 1
-        while User.objects.filter(username=username).exists():
-            username = f"{base_username}{counter}"
-            counter += 1
+        email = personal_info.get('email', '').strip()
+        full_name = personal_info.get('full_name', '')
+        username = _generate_username_from_name(full_name)
         
         if not preferred_church_id:
             return Response(
@@ -160,7 +197,7 @@ class MemberRegisterView(generics.CreateAPIView):
             user = User.objects.create_user(
                 username=username,
                 email=email,
-                password=f"temp{int(timezone.now().timestamp())}",
+                password=_generate_secure_password(24),
                 full_name=personal_info.get('full_name', ''),
                 phone=personal_info.get('phone', ''),
                 role='local_member',
@@ -222,7 +259,6 @@ class MemberRegisterView(generics.CreateAPIView):
                 'message': 'Registration submitted successfully',
                 'registration_id': registration.id,
                 'user_id': user.id,
-                'username': username
             },
             status=status.HTTP_201_CREATED
         )
@@ -408,14 +444,9 @@ def member_register_public(request):
         if duplicate_error:
             return JsonResponse({'error': duplicate_error}, status=400)
         
-        email = personal_info.get('email', '')
-        username = email.split('@')[0] if email else f"user_{int(timezone.now().timestamp())}"
-        
-        base_username = username
-        counter = 1
-        while User.objects.filter(username=username).exists():
-            username = f"{base_username}{counter}"
-            counter += 1
+        email = personal_info.get('email', '').strip()
+        full_name = personal_info.get('full_name', '')
+        username = _generate_username_from_name(full_name)
         
         if not preferred_church_id:
             return JsonResponse({'error': 'Please select a church'}, status=400)
@@ -429,7 +460,7 @@ def member_register_public(request):
             user = User.objects.create_user(
                 username=username,
                 email=email,
-                password=f"temp{int(timezone.now().timestamp())}",
+                password=_generate_secure_password(24),
                 full_name=personal_info.get('full_name', ''),
                 phone=personal_info.get('phone', ''),
                 role='local_member',
@@ -482,7 +513,6 @@ def member_register_public(request):
             'message': 'Registration submitted successfully',
             'registration_id': registration.id,
             'user_id': user.id,
-            'username': username
         }, status=201)
         
     except json.JSONDecodeError as e:
@@ -532,16 +562,8 @@ class ApproveRegistrationView(APIView):
 
         # Generate username from registration full name and a secure password.
         registration_name = (registration.personal_info or {}).get('full_name') or registration.user.full_name or 'member'
-        normalized_name = re.sub(r'\s+', '_', registration_name.strip().lower())
-        base_username = re.sub(r'[^a-z0-9_]', '', normalized_name)[:30] or 'member'
-        generated_username = base_username
-        counter = 1
-        while User.objects.filter(username=generated_username).exclude(id=registration.user_id).exists():
-            generated_username = f'{base_username}{counter}'
-            counter += 1
-
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-        generated_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+        generated_username = _generate_username_from_name(registration_name, exclude_user_id=registration.user_id)
+        generated_password = _generate_secure_password(12)
         
         registration.status = 'approved'
         registration.approved_by = user
@@ -570,19 +592,7 @@ class ApproveRegistrationView(APIView):
 
         if user_account.email:
             try:
-                send_email_notification(
-                    'CFCT Registration Approved - Your Access Credentials',
-                    (
-                        f'Hello {registration_name},\n\n'
-                        'You have been approved access your church and be involved to all activities concerned '
-                        'with your church through this password.\n\n'
-                        f'Username: {generated_username}\n'
-                        f'Password: {generated_password}\n\n'
-                        'Please change your password after first login.\n\n'
-                        'Blessings,\nCFCT Management Team'
-                    ),
-                    [user_account.email],
-                )
+                _send_approval_credentials_email(user_account, registration_name, generated_username, generated_password)
             except Exception as email_error:
                 logger.warning('Approval email failed for user %s: %s', user_account.id, email_error)
         
@@ -781,24 +791,36 @@ class BulkRegistrationActionView(APIView):
         for registration in queryset:
             user_account = registration.user
             if action == 'approve':
+                registration_name = (registration.personal_info or {}).get('full_name') or user_account.full_name or 'member'
+                generated_username = _generate_username_from_name(registration_name, exclude_user_id=registration.user_id)
+                generated_password = _generate_secure_password(12)
+
                 registration.status = 'approved'
                 registration.approved_by = user
                 registration.approved_at = timezone.now()
                 registration.save(update_fields=['status', 'approved_by', 'approved_at'])
 
+                user_account.username = generated_username
+                user_account.set_password(generated_password)
                 user_account.church = registration.church
                 user_account.is_approved = True
                 user_account.is_active = True
                 user_account.approved_by = user
                 user_account.approved_at = timezone.now()
-                user_account.save(update_fields=['church', 'is_approved', 'is_active', 'approved_by', 'approved_at'])
+                user_account.save(update_fields=['username', 'password', 'church', 'is_approved', 'is_active', 'approved_by', 'approved_at'])
 
                 create_notification(
                     user_account,
                     'Registration Approved',
-                    f'Your registration has been approved by {user.full_name}. You can now log in to your account.',
+                    f'Your registration has been approved by {user.full_name}. Username: {generated_username}',
                     'success'
                 )
+
+                if user_account.email:
+                    try:
+                        _send_approval_credentials_email(user_account, registration_name, generated_username, generated_password)
+                    except Exception as email_error:
+                        logger.warning('Bulk approval email failed for user %s: %s', user_account.id, email_error)
             else:
                 registration.status = 'rejected'
                 registration.approved_by = user
