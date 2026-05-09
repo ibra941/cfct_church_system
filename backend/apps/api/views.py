@@ -2,6 +2,7 @@ import csv
 import base64
 import hashlib
 import hmac
+import logging
 import secrets
 import struct
 import time
@@ -114,6 +115,8 @@ HIGH_PRIVILEGE_2FA_ROLES = [
     'local_leader',
     'finance_team',
 ]
+
+logger = logging.getLogger(__name__)
 
 
 def has_role_or_above(user, role):
@@ -2725,12 +2728,26 @@ class MonthlySummaryView(APIView):
     authentication_classes = [JWTAuthentication]
     
     def get(self, request):
+        user_id = getattr(request.user, 'id', None)
+        user_role = getattr(request.user, 'role', None)
         try:
             churches = get_accessible_churches(request.user)
             offerings = Offering.objects.filter(
                 church__in=churches,
                 payment_date__isnull=False,
             )
+
+            try:
+                logger.info(
+                    "monthly_summary:start user_id=%s role=%s churches=%s offerings=%s",
+                    user_id,
+                    user_role,
+                    churches.count(),
+                    offerings.count(),
+                )
+            except Exception:
+                # Logging must never break endpoint behavior.
+                pass
 
             monthly_rows = (
                 offerings
@@ -2762,12 +2779,33 @@ class MonthlySummaryView(APIView):
                 for row in offerings.values('offering_type').annotate(amount=Sum('amount')).order_by('offering_type')
             ]
 
+            try:
+                logger.info(
+                    "monthly_summary:success user_id=%s role=%s monthly_points=%s type_points=%s total_income=%s",
+                    user_id,
+                    user_role,
+                    len(monthly_income),
+                    len(offerings_by_type),
+                    sum(item['amount'] for item in monthly_income),
+                )
+            except Exception:
+                pass
+
             return Response({
                 'monthly_income': monthly_income,
                 'offerings_by_type': offerings_by_type,
                 'total_income': sum(item['amount'] for item in monthly_income),
             })
-        except Exception:
+        except Exception as exc:
+            try:
+                logger.exception(
+                    "monthly_summary:error user_id=%s role=%s error=%s",
+                    user_id,
+                    user_role,
+                    str(exc),
+                )
+            except Exception:
+                pass
             # Keep dashboards functional even if one malformed record exists.
             return Response(
                 {
