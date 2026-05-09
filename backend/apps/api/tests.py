@@ -1,6 +1,5 @@
 import hashlib
 import hmac
-import importlib.util
 import json
 import unittest
 from datetime import timedelta
@@ -17,6 +16,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APITestCase
+from config.urls import SWAGGER_AVAILABLE
 
 from apps.accounts.models import User
 from apps.api.tasks import cleanup_audit_logs
@@ -27,7 +27,7 @@ from apps.prayers.models import PrayerRequest
 from apps.transfers.models import Transfer
 
 
-SWAGGER_AVAILABLE = importlib.util.find_spec('drf_yasg') is not None
+
 
 
 class CoreApiTests(APITestCase):
