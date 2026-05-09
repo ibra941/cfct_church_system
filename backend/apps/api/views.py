@@ -18,7 +18,7 @@ from django.conf import settings
 from decimal import Decimal, InvalidOperation
 from django.db import connection
 from django.db.models import Avg, Count, DecimalField, Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncMonth
 from django.http import HttpResponse
 from django.utils import timezone
 from datetime import date, timedelta
@@ -2725,31 +2725,57 @@ class MonthlySummaryView(APIView):
     authentication_classes = [JWTAuthentication]
     
     def get(self, request):
-        churches = get_accessible_churches(request.user)
-        # Only include offerings with valid payment dates and amounts
-        offerings = Offering.objects.filter(church__in=churches, payment_date__isnull=False)
+        try:
+            churches = get_accessible_churches(request.user)
+            offerings = Offering.objects.filter(
+                church__in=churches,
+                payment_date__isnull=False,
+            )
 
-        monthly_income = []
-        monthly_totals = {}
-        for offering in offerings:
-            if offering.payment_date:  # Double-check payment_date exists
-                month_key = offering.payment_date.strftime('%b %Y')
-                amount = offering.amount or 0
-                monthly_totals[month_key] = monthly_totals.get(month_key, 0) + float(amount)
+            monthly_rows = (
+                offerings
+                .annotate(month=TruncMonth('payment_date'))
+                .values('month')
+                .annotate(
+                    total=Coalesce(
+                        Sum('amount'),
+                        Value(0),
+                        output_field=DecimalField(max_digits=15, decimal_places=2),
+                    )
+                )
+                .order_by('month')
+            )
 
-        for month, amount in sorted(monthly_totals.items()):
-            monthly_income.append({'month': month, 'amount': amount})
+            monthly_income = [
+                {
+                    'month': row['month'].strftime('%b %Y') if row.get('month') else 'Unknown',
+                    'amount': _safe_amount(row.get('total')),
+                }
+                for row in monthly_rows
+            ]
 
-        offerings_by_type = [
-            {'type': row['offering_type'], 'amount': float(row['amount'] or 0)}
-            for row in offerings.values('offering_type').annotate(amount=Sum('amount')).order_by('offering_type')
-        ]
+            offerings_by_type = [
+                {
+                    'type': row.get('offering_type') or 'unknown',
+                    'amount': _safe_amount(row.get('amount')),
+                }
+                for row in offerings.values('offering_type').annotate(amount=Sum('amount')).order_by('offering_type')
+            ]
 
-        return Response({
-            'monthly_income': monthly_income,
-            'offerings_by_type': offerings_by_type,
-            'total_income': sum(item['amount'] for item in monthly_income),
-        })
+            return Response({
+                'monthly_income': monthly_income,
+                'offerings_by_type': offerings_by_type,
+                'total_income': sum(item['amount'] for item in monthly_income),
+            })
+        except Exception:
+            # Keep dashboards functional even if one malformed record exists.
+            return Response(
+                {
+                    'monthly_income': [],
+                    'offerings_by_type': [],
+                    'total_income': 0,
+                }
+            )
 
 class ChurchComparisonView(APIView):
     """Compare churches within the accessible scope (district and above). Returns per-church stats.
