@@ -170,7 +170,8 @@ class MemberRegisterView(generics.CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        duplicate_error = get_registration_blocking_error(personal_info.get('email', '').strip())
+        email = personal_info.get('email', '').strip()
+        duplicate_error = get_registration_blocking_error(email)
         if duplicate_error:
             return Response({'error': duplicate_error}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -389,6 +390,17 @@ class LeaderRegisterMemberView(APIView):
         except Exception:
             pass
 
+        if email:
+            try:
+                _send_approval_credentials_email(
+                    new_user,
+                    new_user.full_name or username,
+                    username,
+                    password,
+                )
+            except Exception as email_error:
+                logger.warning('Leader registration email failed for user %s: %s', new_user.id, email_error)
+
         return Response(
             {
                 'message': 'User registered successfully',
@@ -439,7 +451,8 @@ def member_register_public(request):
         if not personal_info.get('phone'):
             return JsonResponse({'error': 'Phone number is required'}, status=400)
 
-        duplicate_error = get_registration_blocking_error(personal_info.get('email', '').strip())
+        email = personal_info.get('email', '').strip()
+        duplicate_error = get_registration_blocking_error(email)
         if duplicate_error:
             return JsonResponse({'error': duplicate_error}, status=400)
         
