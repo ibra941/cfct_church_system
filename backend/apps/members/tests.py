@@ -1,6 +1,7 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
+from unittest.mock import patch
 
 from apps.accounts.models import User
 from apps.churches.models import Church
@@ -90,6 +91,70 @@ class MembersApiTests(APITestCase):
         self.assertEqual(reg2.status, 'approved')
         self.assertTrue(reg1.user.is_active)
         self.assertTrue(reg2.user.is_active)
+
+    def test_public_register_creates_pending_user_when_required_fields_provided(self):
+        self.client.force_authenticate(user=None)
+        payload = {
+            'personal_info': {
+                'full_name': 'Public Member',
+                'email': 'public.member@test.com',
+                'phone': '0712345678',
+            },
+            'guardian_info': {},
+            'spiritual_info': {},
+            'preferred_church_id': self.church.id,
+        }
+
+        response = self.client.post('/api/members/public/register/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        created_user = User.objects.get(email='public.member@test.com')
+        self.assertFalse(created_user.is_active)
+        self.assertFalse(created_user.is_approved)
+        self.assertTrue(MemberRegistration.objects.filter(user=created_user, status='pending').exists())
+
+    @patch('apps.members.views.send_email_notification')
+    def test_approve_registration_sends_credentials_email(self, send_email_mock):
+        registration = self._create_pending_registration('pending3', 'pending3@test.com', phone='0744444444')
+
+        response = self.client.post(f'/api/members/registrations/{registration.id}/approve/', format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        send_email_mock.assert_called_once()
+
+        args = send_email_mock.call_args[0]
+        self.assertIn('CFCT Registration Approved', args[0])
+        self.assertIn('Username:', args[1])
+        self.assertIn('Password:', args[1])
+        self.assertEqual(args[2], ['pending3@test.com'])
+
+    @patch('apps.members.views.send_email_notification')
+    def test_leader_register_sends_credentials_email(self, send_email_mock):
+        payload = {
+            'personal_info': {
+                'full_name': 'Leader Created Member',
+                'email': 'leader.created@test.com',
+                'phone': '0766666666',
+            },
+            'guardian_info': {},
+            'spiritual_info': {},
+            'preferred_church_id': self.church.id,
+            'role': 'local_member',
+        }
+
+        response = self.client.post('/api/members/leader/register/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        send_email_mock.assert_called_once()
+
+        args = send_email_mock.call_args[0]
+        self.assertIn('CFCT Registration Approved', args[0])
+        self.assertIn('Username:', args[1])
+        self.assertIn('Password:', args[1])
+        self.assertEqual(args[2], ['leader.created@test.com'])
+
+        created_user = User.objects.get(email='leader.created@test.com')
+        self.assertTrue(created_user.is_active)
+        self.assertTrue(created_user.is_approved)
+        self.assertTrue(MemberRegistration.objects.filter(user=created_user, status='approved').exists())
 
     def test_member_csv_import_creates_pending_registration(self):
         csv_content = "full_name,email,phone,neighborhood\nJohn Doe,john.doe@test.com,0755555555,Kijitonyama\n"
