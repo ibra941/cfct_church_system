@@ -129,20 +129,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Ensure PR refs are available
-      if: github.event_name == 'pull_request'
-      run: |
-        git fetch --no-tags origin \
-          +refs/heads/${{ github.event.pull_request.base.ref }}:refs/remotes/origin/${{ github.event.pull_request.base.ref }}
-        git fetch --no-tags origin \
-          +refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/pull/${{ github.event.pull_request.number }}/head
-
-    - name: Verify commits exist
-      if: github.event_name == 'pull_request'
-      run: |
-        git rev-parse "${{ github.event.pull_request.base.sha }}"
-        git rev-parse "${{ github.sha }}"
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
     - name: Run secrets scan (gitleaks)
       uses: gitleaks/gitleaks-action@v2
